@@ -31,7 +31,7 @@ initialize_weights(25,4,params,'output')
 assert(params['Wlayer1'].shape == (2,25))
 assert(params['blayer1'].shape == (25,))
 
-#expect 0, [0.05 to 0.12]
+# expect 0, [0.05 to 0.12]
 print("{}, {:.2f}".format(params['blayer1'].sum(),params['Wlayer1'].std()**2))
 print("{}, {:.2f}".format(params['boutput'].sum(),params['Woutput'].std()**2))
 
@@ -80,40 +80,17 @@ batches = get_random_batches(x,y,5)
 print([_[0].shape[0] for _ in batches])
 batch_num = len(batches)
 
-# WRITE A TRAINING LOOP HERE
-max_iters = 500
-learning_rate = 1e-3
-# with default settings, you should get loss < 35 and accuracy > 75%
-for itr in range(max_iters):
-    total_loss = 0
-    avg_acc = 0
-    for xb,yb in batches:
-        pass
-        # forward
-
-        # loss
-        # be sure to add loss and accuracy to epoch totals 
-
-        # backward
-
-        # apply gradient
-
-        
-    if itr % 100 == 0:
-        print("itr: {:02d} \t loss: {:.2f} \t acc : {:.2f}".format(itr,total_loss,avg_acc))
-
 
 # Q 2.5 should be implemented in this file
-# you can do this before or after training the network. 
-
-
+# you can do this before or after training the network.
 # save the old params
 import copy
 params_orig = copy.deepcopy(params)
 
 eps = 1e-6
+
 for k,v in params.items():
-    if '_' in k: 
+    if '_' in k:
         continue
     # we have a real parameter!
     # for each value inside the parameter
@@ -121,8 +98,60 @@ for k,v in params.items():
     #   run the network
     #   get the loss
     #   compute derivative with central diffs
-    
-    
+    dim = len(v.shape)
+    if dim == 2:
+        for j in range(v.shape[0]):
+            for i in range(v.shape[1]):
+                # params[k][j][i] += eps
+                v[j][i] += eps
+
+                out = forward(x, params, 'layer1')
+                probs = forward(out, params, 'output', softmax)
+                loss1, _ = compute_loss_and_acc(y, probs)
+
+                # params[k][j][i] -= 2 * eps
+                v[j][i] -= 2 * eps
+
+                out = forward(x, params, 'layer1')
+                probs = forward(out, params, 'output', softmax)
+                loss2, _ = compute_loss_and_acc(y, probs)
+
+                loss1 = np.sum(loss1)
+                loss2 = np.sum(loss2)
+
+                grad = (loss1 - loss2) / (2 * eps)
+
+                params['grad_' + k][i][j] = grad
+
+                # params[k][j][i] += eps
+                v[j][i] += eps
+    else:
+        for i in range(len(v)):
+            # params[k][i] += eps
+            v[i] += eps
+
+            out = forward(x, params, 'layer1')
+            probs = forward(out, params, 'output', softmax)
+            loss1, _ = compute_loss_and_acc(y, probs)
+
+            # params[k][i] -= 2 * eps
+            v[i] -= 2 * eps
+
+            out = forward(x, params, 'layer1')
+            probs = forward(out, params, 'output', softmax)
+            loss2, _ = compute_loss_and_acc(y, probs)
+
+            loss1 = np.sum(loss1)
+            loss2 = np.sum(loss2)
+
+            grad = (loss1 - loss2) / (2 * eps)
+
+            print("grad:", grad)
+
+            params['grad_' + k][i] = grad
+
+            # params[k][i] += eps
+            v[i] -= 2 * eps
 
 total_error = 0
 for k in params.keys():
@@ -134,3 +163,47 @@ for k in params.keys():
         total_error += err
 # should be less than 1e-4
 print('total {:.2e}'.format(total_error))
+
+
+# WRITE A TRAINING LOOP HERE
+max_iters = 500
+learning_rate = 1e-3
+
+# with default settings, you should get loss < 35 and accuracy > 75%
+for itr in range(max_iters):
+    batches = get_random_batches(x, y, 5)
+    total_loss = 0
+    total_acc = 0
+    cnt = 0
+
+    for xb,yb in batches:
+        # forward
+        out = forward(xb, params, 'layer1')
+        probs = forward(out, params, 'output', softmax)
+
+        # loss
+        # be sure to add loss and accuracy to epoch totals
+        loss, acc = compute_loss_and_acc(yb, probs)
+        total_loss += sum(loss)
+        total_acc += acc
+        cnt += 1
+
+        # backward
+        delta1 = probs - yb
+        delta2 = backwards(delta1, params, 'output', linear_deriv)
+        backwards(delta2, params, 'layer1', sigmoid_deriv)
+
+        # apply gradient
+        grad_W_o = params['grad_W' + 'output']
+        grad_b_o = params['grad_b' + 'output']
+
+        grad_W_l = params['grad_W' + 'layer1']
+        grad_b_l = params['grad_b' + 'layer1']
+
+        params['W' + 'output'] -= learning_rate * grad_W_o.T
+        params['b' + 'output'] -= learning_rate * grad_b_o
+        params['W' + 'layer1'] -= learning_rate * grad_W_l.T
+        params['b' + 'layer1'] -= learning_rate * grad_b_l
+        
+    if itr % 100 == 0:
+        print("itr: {:02d} \t loss: {:.2f} \t acc : {:.2f}".format(itr,total_loss,total_acc/cnt))
