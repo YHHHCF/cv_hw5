@@ -8,5 +8,5 @@ if [ ! -f images.zip ]; then
 fi
 unzip data.zip -d ../data/
 unzip images.zip -d ../images/
-rm images.zip
-rm data.zip
+# rm images.zip
+# rm data.zip
